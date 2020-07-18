@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Open Layers User Interaction</title>
+    <link rel="stylesheet" href="http://openlayers.org/en/v3.16.0/css/ol.css" type="text/css">
+    <script src="http://openlayers.org/en/v3.16.0/build/ol.js"></script>
+	<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+
+  </head>
+  <body>
+  	<form>
+  Factory name:<br>
+  <input id="factory" type="text" value="LINDAU CHEMICAL"><br>
+  Distance(m):<br>
+  <input id="distance" type="text" value=10000>
+  <input type="button" value="Find School" onclick="findSchool();">	
+</form>
+    <div id="map" class="map"></div>
+	<iframe id="info" width="800" height="100"> </iframe>
+    <script>
+ 
+// Create the map 
+
+      var view = new ol.View({
+          center: [-9015705,4026797],
+          zoom: 11      
+		  });
+
+       var map = new ol.Map({
+        layers: [
+          new ol.layer.Tile({
+            source: new ol.source.OSM()
+          })
+        ],
+        target: 'map',
+        view: view
+      });
+
+/////////////////////////////////////////////////////////
+	  
+// Add geoserver layers and a WMS....
+
+var theurl = 'http://localhost:8080/geoserver/richland_postgres/wms';
+
+//  add the bk79 layer. All other wms layers will following this pattern, but with a twist	
+	var bk79 = new ol.layer.Image({
+          source: new ol.source.ImageWMS({
+            url: theurl,
+            params: {'LAYERS': 'richland:bk79'},
+            serverType: 'geoserver'
+          })	
+		});		
+     bk79.setOpacity(0.3);
+  
+//  add tri92 layer
+	var tri92 = new ol.layer.Image({
+          source: new ol.source.ImageWMS({
+            url: theurl,
+            params: {'LAYERS': 'richland_postgres:tri92'},
+            serverType: 'geoserver'
+          })
+		});			
+
+// here we will add the schools, but are going to play around with some filters to
+// find schools that are near a tri92 faculty, and in this case, we are going to get
+// the parameters from the input box instead of a hard coded variable.
+
+//  add school layer - in this case we will use an SQL View where we pass in the 
+//  factory name (factory) and the distance (d) from the HTML form we created above.
+
+	var viewparameters = 'f:' + document.getElementById('factory').value + ';d:' + document.getElementById('distance').value;
+
+	var schoolnear = new ol.layer.Image({
+           source: new ol.source.ImageWMS({
+            url: theurl,
+           params: {'LAYERS': 'richland_postgres:schoolquery', 'viewparams': viewparameters},
+            serverType: 'geoserver'
+          })
+		});	
+
+//  CQL filters
+//  add school layer - uses an example CQL.  But in this case, instead of hard coded values,
+//  we'll grab it from the HTML form.
+	var cqlfilter = '';
+//	var cqlfilter = 'DWITHIN(geometry,Point(503909 3768402),5000,meters)';
+//	var cqlfilter = 'DWITHIN(geometry, collectGeometries(queryCollection(\'richland_postgres:tri92\',\'geomery\',\'INCLUDE\')), 2000, meters)';
+//	var cqlfilter = 'DWITHIN(geometry, collectGeometries(queryCollection(\'richland_postgres:tri92\',\'geometry\',\'name = \'\'LINDAU CHEMICAL\'\' \')), 15000, meters)' ;
+//	var cqlfilter = 'DWITHIN(geometry, collectGeometries(queryCollection(\'richland_postgres:tri92\',\'geometry\',\'name = \'\'' + document.getElementById('factory').value + '\'\' \')), ' + document.getElementById('distance').value + ', meters)' ;
+
+	//var cqlfilter = 'INTERSECTS(geometry, querySingle(\'richland_postgres:censusblocks\',\'geometry\',\'trbk = \'\'11604327\'\' \'))';	
+	//var cqlfilter = 'INTERSECTS(geometry,POLYGON((4.9635510369342647e5 3.7638427893375405e6, 4.9905221831296431e5 3.7620299745932613e6, 5.0099767803853255e5 3.7629142744685193e6, 5.0170511793873919e5 3.7639754343188293e6, 5.0130718299487297e5 3.765788249063109e6, 5.0024602314456302e5 3.7669378389009447e6, 4.9945015325683053e5 3.7672473438572851e6, 4.9847742339404637e5 3.7669378389009447e6, 4.9679725363105559e5 3.765699819075583e6, 4.9635510369342647e5 3.7638427893375405e6)))';
+
+	var schoolcql = new ol.layer.Image({
+          source: new ol.source.ImageWMS({
+            url: theurl,
+            params: {'LAYERS': 'richland_postgres:schools','CQL_FILTER': cqlfilter},
+            serverType: 'geoserver'
+          })
+		});	
+			
+//  add the layers to the map
+		
+	map.addLayer(bk79);	
+	//map.addLayer(tri92);
+	map.addLayer(schoolnear);
+	map.addLayer(schoolcql);
+	
+
+//////////////////////////////////////////////
+
+// This function takes the input from the HTML form and updates the filters 
+// to select schools that are a certain distance from the selected factory.
+// This is shown for both a CQL filter and an SQL View.
+
+function findSchool() {
+	cqlfilter = 'DWITHIN(geometry, collectGeometries(queryCollection(\'richland_postgres:tri92\',\'geometry\',\'name = \'\'' + document.getElementById('factory').value + '\'\' \')), ' + document.getElementById('distance').value + ', meters)' ;
+	schoolcql.getSource().updateParams({'LAYERS': 'richland_postgres:schools','CQL_FILTER': cqlfilter});
+	viewparameters = 'f:' + document.getElementById('factory').value + ';d:' + document.getElementById('distance').value;
+	schoolnear.getSource().updateParams({'LAYERS': 'richland_postgres:schoolquery', 'viewparams': viewparameters});
+}	  
+
+
+//////////////////////////////////////////////
+
+// We are going to extend the application to handle user input. In this case, if the user 
+// clicks on the map, we fire off an event function.  This event will specifically 
+// get the Feature Information on the schoolcql layer.  The results will get passed
+// to the HTML element 'info', to display the attributes.
+
+ map.on('singleclick', function(evt) {
+       document.getElementById('info').innerHTML = "Loading... please wait...";
+        var view = map.getView();
+        var url = schoolcql.getSource().getGetFeatureInfoUrl(
+          evt.coordinate, view.getResolution(), view.getProjection(),
+          {'INFO_FORMAT': 'text/html', 'FEATURE_COUNT': 50});
+		prompt('',url);
+       if (url) {
+          document.getElementById('info').src = url;
+        }
+      });
+
+
+////////////////////////////
+
+    </script>
+  </body>
+</html>
