@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>A Simple Map</title>
+    <link rel="stylesheet" href="http://openlayers.org/en/v3.16.0/css/ol.css" type="text/css">
+    <script src="http://openlayers.org/en/v3.16.0/build/ol.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ol3/4.6.5/ol.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ol3/4.6.5/ol.js"></script>
+  </head>
+  <body>
+    <div id="map" class="map"></div>
+    <script>
+// Create the map 
+       var map = new ol.Map({
+        layers: [
+          new ol.layer.Tile({
+            source: new ol.source.OSM()
+          })
+        ],
+        target: 'map',
+        view: new ol.View({
+          center: [-9015705,4026797],
+          zoom: 11
+        })
+      });
+// ADD LAYERS....
+//  add the bk79 layer	
+	var bk79 = new ol.layer.Image({
+          source: new ol.source.ImageWMS({
+            url: 'http://localhost:8080/geoserver/richland_postgres/wms',
+            params: {'LAYERS': 'richland:bk79'},
+            serverType: 'geoserver'
+          })	
+		});	
+   bk79.setOpacity(0.3);
+ 
+//  add tri92 layer
+	var tri92 = new ol.layer.Image({
+          source: new ol.source.ImageWMS({
+            url: 'http://localhost:8080/geoserver/richland_postgres/wms',
+            params: {'LAYERS': 'richland_postgres:tri92'},
+            serverType: 'geoserver'
+          })
+		});	
+		
+//  add school layer - use an SQL View where we pass in the factory name (factory) and the distance (d) 
+	var factory = 'LINDAU CHEMICAL';		
+	var schoolnear = new ol.layer.Image({
+          source: new ol.source.ImageWMS({
+            url: 'http://localhost:8080/geoserver/richland_postgres/wms',
+            params: {'LAYERS': 'richland_postgres:schoolquery', 'viewparams': 'f:'+factory+';d:5000'},
+            serverType: 'geoserver'
+          })
+		});	
+		
+//  add the layers to the map
+	map.addLayer(bk79);	
+	map.addLayer(tri92);
+	map.addLayer(schoolnear);
+    </script>
+  </body>
+</html>

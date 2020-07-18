@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Open Layers Example</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/ol3/4.6.5/ol.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ol3/4.6.5/ol.js"></script>
+	<script src="http://code.jquery.com/jquery-1.11.0.min.js"></script>
+
+  </head>
+  <body>
+     <div id="map" class="map"></div>
+    <script>
+ 
+// Create the map 
+
+      var view = new ol.View({
+          center: [-9015705,4026797],
+          zoom: 11      
+		  });
+
+       var map = new ol.Map({
+        layers: [
+          new ol.layer.Tile({
+            source: new ol.source.OSM()
+          })
+        ],
+        target: 'map',
+        view: view
+      });
+
+/////////////////////////////////////////////////////////
+	  
+// Add geoserver layers and a WMS....
+
+// this line represents the generic wms url so we don't have to keep adding it
+var theurl = 'http://localhost:8082/geoserver/richlandPostgres/wmss';
+
+//  add the bk79 layer. All other wms layers will following this pattern, but with a twist
+	var bk79 = new ol.layer.Image({
+          source: new ol.source.ImageWMS({
+            url: theurl,
+            params: {'LAYERS': 'richland:bk79'},
+            serverType: 'geoserver'
+          })	
+		});		
+     bk79.setOpacity(0.3);   // this is how you can change the opacity of the layer
+  
+//  add the tri92 layer
+	var tri92 = new ol.layer.Image({
+          source: new ol.source.ImageWMS({
+            url: theurl,
+            params: {'LAYERS': 'richlandPostgres:tri92'},
+            serverType: 'geoserver'
+          })
+		});	
+
+// here we will add the schools, but are going to play around with some filters to
+// find schools that are near a tri92 faculty....
+		
+var factory = 'LINDAU CHEMICAL';  // hard coding the factory to search around
+var distance = 5000;
+
+//  add school layer - in this case we will use an SQL View where we pass in the 
+//  factory name (factory) and the distance (d) 
+//var distance = prompt('enter distance','');
+	var schoolnear = new ol.layer.Image({
+          source: new ol.source.ImageWMS({
+            url: theurl,
+            params: {'LAYERS': 'richlandPostgres:richlandSql', 'viewparams': 'f:'+factory+';d:' + distance},
+            serverType: 'geoserver'
+          })
+		});	
+
+//  CQL filters
+    var cqlfilter = '';
+//  add school layer - uses an example CQL
+//	var cqlfilter = 'DWITHIN(geometry,Point(503909 3768402),5000,meters)';
+//	var cqlfilter = 'DWITHIN(geometry, collectGeometries(queryCollection(\'richland_postgres:tri92\',\'geometry\',\'INCLUDE\')), 10000, meters)';
+//	var cqlfilter = 'DWITHIN(geometry, collectGeometries(queryCollection(\'richland_postgres:tri92\',\'geometry\',\'name = \'\'LINDAU CHEMICAL\'\' \')), 5000, meters)' ;
+
+//	var cqlfilter = 'INTERSECTS(geometry, querySingle(\'richland_postgres:censusblocks\',\'geometry\',\'trbk = \'\'11604327\'\' \'))';	
+//	var cqlfilter = 'INTERSECTS(geometry,POLYGON((4.9635510369342647e5 3.7638427893375405e6, 4.9905221831296431e5 3.7620299745932613e6, 5.0099767803853255e5 3.7629142744685193e6, 5.0170511793873919e5 3.7639754343188293e6, 5.0130718299487297e5 3.765788249063109e6, 5.0024602314456302e5 3.7669378389009447e6, 4.9945015325683053e5 3.7672473438572851e6, 4.9847742339404637e5 3.7669378389009447e6, 4.9679725363105559e5 3.765699819075583e6, 4.9635510369342647e5 3.7638427893375405e6)))';
+
+	var schoolcql = new ol.layer.Image({
+          source: new ol.source.ImageWMS({
+            url: theurl,
+            params: {'LAYERS': 'richlandPostgres:richlandSql',
+			'CQL_FILTER': cqlfilter},
+            serverType: 'geoserver'
+          })
+		});	
+			
+//  add the layers to the map
+		
+	map.addLayer(bk79);	
+	map.addLayer(schoolnear);
+	//map.addLayer(tri92);
+	map.addLayer(schoolcql);
+    </script>
+  </body>
+</html>
